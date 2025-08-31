@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XX盒V1.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background-color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.2rem;
+        }
+        
+        .buttons-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 600px) {
+            .buttons-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .audio-btn {
+            padding: 20px 0;
+            font-size: 1.8rem;
+            font-weight: bold;
+            background-color: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #333;
+        }
+        
+        .audio-btn:hover {
+            background-color: #e9ecef;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .audio-btn:active, .audio-btn.active {
+            background-color: #cce5ff;
+            border-color: #b8daff;
+            transform: translateY(0);
+        }
+        
+        .now-playing {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            color: #495057;
+            min-height: 60px;
+        }
+        
+        .now-playing span {
+            color: #007bff;
+            font-weight: bold;
+        }
+        
+        .instructions {
+            margin-top: 25px;
+            color: #6c757d;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+        
+        .error {
+            color: #dc3545;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8d7da;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>XX盒</h1>
+    <!-- 在这里修改按钮名字/添加音频,不需要添加音频后缀(例:.mav .mp3) -->
+        <div class="buttons-container">
+            <button class="audio-btn" data-audio="1">1</button>
+            <button class="audio-btn" data-audio="2">2</button>
+            <button class="audio-btn" data-audio="3">3</button>
+            <button class="audio-btn" data-audio="4">4</button>
+            <button class="audio-btn" data-audio="5">5</button>
+            <button class="audio-btn" data-audio="6">6</button>	
+        </div>
+        
+        <div class="now-playing" id="nowPlaying">
+            当前未播放音频
+        </div>
+        
+        <div class="error" id="errorMsg"></div>
+        
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const buttons = document.querySelectorAll('.audio-btn');
+            const nowPlaying = document.getElementById('nowPlaying');
+            const errorMsg = document.getElementById('errorMsg');
+            let currentAudio = null;
+            let currentButton = null;
+            
+            // 用户交互后启用音频
+            document.body.addEventListener('click', function() {
+                // 这个空事件处理程序帮助浏览器解锁音频播放
+            }, { once: true });
+            
+            // 尝试播放音频的函数
+            function tryPlayAudio(audioFile, button) {
+                // 停止当前播放的音频
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentButton.classList.remove('active');
+                }
+                
+                // 创建新的音频对象
+                const audio = new Audio();
+                
+                // 尝试多种可能的文件路径和格式
+                const sources = [
+                    `${audioFile}.mav`,
+                    `${audioFile}.mp3`,
+                    `${audioFile}.wav`,
+                    `audio/${audioFile}.mav`,
+                    `audio/${audioFile}.mp3`,
+                    `audio/${audioFile}.wav`,
+                    `sounds/${audioFile}.mav`,
+                    `sounds/${audioFile}.mp3`,
+                    `sounds/${audioFile}.wav`
+                ];
+                
+                let sourceIndex = 0;
+                
+                // 尝试加载音频源
+                function tryNextSource() {
+                    if (sourceIndex >= sources.length) {
+                        errorMsg.textContent = `错误: 无法找到音频文件 ${audioFile}，请确保文件存在且路径正确`;
+                        errorMsg.style.display = 'block';
+                        return;
+                    }
+                    
+                    const source = sources[sourceIndex++];
+                    audio.src = source;
+                    
+                    audio.load();
+                    
+                    audio.oncanplaythrough = function() {
+                        audio.play()
+                            .then(() => {
+                                // 成功播放
+                                errorMsg.style.display = 'none';
+                                currentAudio = audio;
+                                button.classList.add('active');
+                                currentButton = button;
+                                nowPlaying.innerHTML = `正在播放: <span>${source}</span>`;
+                                
+                                // 音频播放结束后的处理
+                                audio.onended = function() {
+                                    button.classList.remove('active');
+                                    currentAudio = null;
+                                    currentButton = null;
+                                    nowPlaying.innerHTML = '播放完成';
+                                };
+                            })
+                            .catch(error => {
+                                // 播放失败，尝试下一个源
+                                tryNextSource();
+                            });
+                    };
+                    
+                    audio.onerror = function() {
+                        // 加载失败，尝试下一个源
+                        tryNextSource();
+                    };
+                }
+                
+                // 开始尝试播放
+                tryNextSource();
+            }
+            
+            // 为每个按钮添加点击事件
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const audioFile = this.getAttribute('data-audio');
+                    
+                    // 如果点击的是当前正在播放的按钮，停止播放
+                    if (currentButton === this && currentAudio) {
+                        currentAudio.pause();
+                        currentAudio = null;
+                        currentButton.classList.remove('active');
+                        currentButton = null;
+                        nowPlaying.innerHTML = '播放已停止';
+                        errorMsg.style.display = 'none';
+                        return;
+                    }
+                    
+                    // 尝试播放音频
+                    tryPlayAudio(audioFile, this);
+                });
+            });
+        });
+    </script>
+    <a href="https://github.com/ssqls666" target="_blank">
+    <img style="position: fixed; top: 0; right: 0; border: 0; z-index: 1;" src="http://images.cnblogs.com/cnblogs_com/jackson0714/779808/o_github.png" >
+</a>
+</a>
+</body>
+</html>
